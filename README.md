@@ -55,7 +55,7 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 1. **Run the Streamlit app:**
 
     ```bash
-    streamlit run app.py
+    streamlit run GTFS_Inspector.py
     ```
 
 2. **Interact with the app:**
