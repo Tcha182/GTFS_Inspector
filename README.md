@@ -15,8 +15,8 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/yourusername/gtfs-detective.git
-    cd gtfs-detective
+    git clone https://github.com/Tcha182/GTFS_Inspector.git
+    cd GTFS_Inspector
     ```
 
 2. **Create a virtual environment:**
