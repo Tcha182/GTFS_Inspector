@@ -100,7 +100,8 @@ def get_filtered_vehicle_data(vehicle_data, selected_vehicle_ids=None):
         return dataframe[dataframe['vehicle_vehicle_id'].isin(selected_vehicle_ids)]
     return dataframe
 
-# Function to create a map (no caching here due to folium's limitations)
+# Function to create a map
+@st.cache_resource
 def create_map(filtered_vehicle_data):
     if not filtered_vehicle_data.empty:
         map_center = [filtered_vehicle_data['vehicle_position_latitude'].mean(), filtered_vehicle_data['vehicle_position_longitude'].mean()]
