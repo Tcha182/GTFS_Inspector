@@ -92,22 +92,77 @@ def open_gtfs_realtime_from_url(url):
         st.error(f"Error opening GTFS RT URL: {e}")
         return None
 
-# Function to cache filtered vehicle data
 @st.cache_data
-def get_filtered_vehicle_data(vehicle_data, selected_vehicle_ids=None):
-    dataframe = vehicle_data.dropna(subset=['vehicle_position_latitude', 'vehicle_position_longitude'])
-    if selected_vehicle_ids:
-        return dataframe[dataframe['vehicle_vehicle_id'].isin(selected_vehicle_ids)]
-    return dataframe
+def get_filtered_data(vehicle_data, trip_data, selected_vehicle_ids=None, selected_trip_ids=None, selected_route_ids=None):
+    # Filter vehicle_data
+    if not vehicle_data.empty:
+        # Filter by vehicle_id
+        if selected_vehicle_ids and 'vehicle_vehicle_id' in vehicle_data.columns:
+            vehicle_data = vehicle_data[vehicle_data['vehicle_vehicle_id'].isin(selected_vehicle_ids)]
+
+        # Filter by trip_id
+        if selected_trip_ids and 'vehicle_trip_tripId' in vehicle_data.columns:
+            vehicle_data = vehicle_data[vehicle_data['vehicle_trip_tripId'].isin(selected_trip_ids)]
+
+        # Filter by route_id
+        if selected_route_ids and 'vehicle_trip_routeId' in vehicle_data.columns:
+            vehicle_data = vehicle_data[vehicle_data['vehicle_trip_routeId'].isin(selected_route_ids)]
+
+        # Collect trip IDs from vehicle_data
+        if 'vehicle_trip_tripId' in vehicle_data.columns:
+            vehicle_trip_ids = vehicle_data['vehicle_trip_tripId'].dropna().unique().tolist()
+        else:
+            vehicle_trip_ids = []
+    else:
+        vehicle_trip_ids = []
+
+    # Filter trip_data
+    if not trip_data.empty:
+        # Filter by trip_id
+        if selected_trip_ids and 'tripUpdate_trip_tripId' in trip_data.columns:
+            trip_data = trip_data[trip_data['tripUpdate_trip_tripId'].isin(selected_trip_ids)]
+
+        # Filter by route_id
+        if selected_route_ids and 'tripUpdate_trip_routeId' in trip_data.columns:
+            trip_data = trip_data[trip_data['tripUpdate_trip_routeId'].isin(selected_route_ids)]
+
+        # Filter by vehicle_id
+        if selected_vehicle_ids and 'tripUpdate_vehicle_id' in trip_data.columns:
+            trip_data = trip_data[trip_data['tripUpdate_vehicle_id'].isin(selected_vehicle_ids)]
+
+        # Include trips associated with vehicles in vehicle_data
+        if vehicle_trip_ids and 'tripUpdate_trip_tripId' in trip_data.columns:
+            trip_data = trip_data[trip_data['tripUpdate_trip_tripId'].isin(vehicle_trip_ids)]
+
+        # Collect vehicle IDs from trip_data
+        if 'tripUpdate_vehicle_id' in trip_data.columns:
+            trip_vehicle_ids = trip_data['tripUpdate_vehicle_id'].dropna().unique().tolist()
+        else:
+            trip_vehicle_ids = []
+    else:
+        trip_vehicle_ids = []
+
+    # Filter vehicle_data based on vehicle IDs from trip_data
+    if not vehicle_data.empty and trip_vehicle_ids:
+        if 'vehicle_vehicle_id' in vehicle_data.columns:
+            vehicle_data = vehicle_data[vehicle_data['vehicle_vehicle_id'].isin(trip_vehicle_ids)]
+
+    return vehicle_data, trip_data
+
+
 
 # Function to create a map
 @st.cache_resource
 def create_map(filtered_vehicle_data):
+    # Drop rows with missing latitude and longitude values
+    if 'vehicle_position_latitude' in filtered_vehicle_data.columns and 'vehicle_position_longitude' in filtered_vehicle_data.columns:
+        filtered_vehicle_data = filtered_vehicle_data.dropna(subset=['vehicle_position_latitude', 'vehicle_position_longitude'])
+
     if not filtered_vehicle_data.empty:
         map_center = [filtered_vehicle_data['vehicle_position_latitude'].mean(), filtered_vehicle_data['vehicle_position_longitude'].mean()]
         zoom_level = 12
     else:
-        map_center = [48.8566, 2.3522]
+        map_center = [48.8566, 2.3522]  # Default location (e.g., Paris)
         zoom_level = 12
 
     m = folium.Map(location=map_center, zoom_start=zoom_level)
@@ -151,12 +206,23 @@ def protobuf_to_dataframe(feed):
         rows.append(flattened_entity)
     return pd.DataFrame(rows)
 
+def smart_sort(data):
+    if all(str(x).isdigit() for x in data):
+        # If all items are numeric, sort as integers
+        return sorted(data, key=int)
+    else:
+        # If items are mixed, sort as strings
+        return sorted(data, key=str)
+
 # Title
 title_container = st.empty()
-title_container.title("GTFS Detective")
+if 'title' not in st.session_state:
+    st.session_state['title'] = "GTFS Inspector"
+
+title_container.title(st.session_state.title)
 
 # Sidebar
-st.sidebar.header("Manage GTFS RT")
+st.sidebar.header("Manage Sources")
 
 # Refresh Button
 if st.sidebar.button(":material/refresh: Refresh"):
@@ -204,7 +270,7 @@ if action == "Modify":
 if action == "Delete":
     name_to_delete = st.sidebar.selectbox("Select GTFS RT to Delete", network_list)
     if name_to_delete:
-        if st.sidebar.button("Delete Selected GTFS RT"):
+        if st.sidebar.button(f"Delete {name_to_delete}"):
             delete_network_file(name_to_delete)
             clear_network_session_state()
 
@@ -216,7 +282,7 @@ else:
     st.write("No networks available. Please add a network.")
 
 # Load GTFS data button action
-if st.button("Load GTFS", use_container_width=True):
+if st.button(f":material/system_update_alt: Load GTFS RT {selected_name}", use_container_width=True):
     if selected_name:
         status_container = st.empty()
         status_container.info("Loading data...")
@@ -243,8 +309,9 @@ if st.button("Load GTFS", use_container_width=True):
                 st.session_state['trip_data'] = trip_data
                 st.session_state['selected_name'] = selected_name
                 st.session_state['fetch_time'] = fetch_time
+                st.session_state['title'] = f"{selected_name} - {fetch_time}"
 
-                title_container.title(f"GTFS Detective - {selected_name} - {fetch_time}")
+                title_container.title(st.session_state.title)
 
                 status_container.success("Data loaded successfully!")
         except Exception as e:
@@ -259,47 +326,94 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
 
     if not vehicle_data.empty or not trip_data.empty:
         col1, col2 = st.columns(2)
-        available_vehicle_ids = set()
-        if 'vehicle_vehicle_id' in vehicle_data.columns:
-            available_vehicle_ids.update(vehicle_data['vehicle_vehicle_id'].unique())
-        if 'tripUpdate_vehicle_id' in trip_data.columns:
-            available_vehicle_ids.update(trip_data['tripUpdate_vehicle_id'].unique())
 
-        sorted_vehicle_ids = sorted(available_vehicle_ids, key=lambda x: int(x) if str(x).isdigit() else str(x))
-        selected_vehicle_ids = col1.multiselect("Select Vehicles", sorted_vehicle_ids)
+        # Preliminary filter selection
+        filter_option = st.selectbox("Select Filter Type", ["Vehicle ID", "Trip ID", "Route ID"], key="filter_option")
 
-        # Get filtered vehicle data using cache
-        filtered_vehicle_data = get_filtered_vehicle_data(vehicle_data, selected_vehicle_ids)
+        # Define filter variables to None initially
+        selected_vehicle_ids, selected_trip_ids, selected_route_ids = None, None, None
 
-        # Prepare the data for tabs
-        tabs = []
-        tab_contents = []
+        # Depending on the selected filter option, show the appropriate multiselect filter
+        if filter_option == "Vehicle ID":
+            # Vehicle ID filter
+            available_vehicle_ids = set()
+            if 'vehicle_vehicle_id' in vehicle_data.columns:
+                available_vehicle_ids.update(vehicle_data['vehicle_vehicle_id'].unique())
+            sorted_vehicle_ids = smart_sort(available_vehicle_ids)
+            selected_vehicle_ids = st.multiselect("Select Vehicles", sorted_vehicle_ids)
 
-        if not filtered_vehicle_data.empty:
-            tabs.append(f"Vehicle Positions ({len(filtered_vehicle_data)})")
-            tab_contents.append(filtered_vehicle_data)
-        if not trip_data.empty:
-            tabs.append(f"Trip Updates ({len(trip_data)})")
-            tab_contents.append(trip_data)
+        elif filter_option == "Trip ID":
+            # Trip ID filter
+            available_trip_ids = set()
+            if 'vehicle_trip_tripId' in vehicle_data.columns:
+                available_trip_ids.update(vehicle_data['vehicle_trip_tripId'].unique())
+            if 'tripUpdate_trip_tripId' in trip_data.columns:
+                available_trip_ids.update(trip_data['tripUpdate_trip_tripId'].unique())
+            sorted_trip_ids = smart_sort(available_trip_ids)
+            selected_trip_ids = st.multiselect("Select Trips", sorted_trip_ids)
 
-        # Display tabs for data
-        if tabs:
-            selected_tab = col1.tabs(tabs)
+        elif filter_option == "Route ID":
+            # Route ID filter
+            available_route_ids = set()
+            if 'vehicle_trip_routeId' in vehicle_data.columns:
+                available_route_ids.update(vehicle_data['vehicle_trip_routeId'].unique())
+            if 'tripUpdate_trip_routeId' in trip_data.columns:
+                available_route_ids.update(trip_data['tripUpdate_trip_routeId'].unique())
+            sorted_route_ids = smart_sort(available_route_ids)
+            selected_route_ids = st.multiselect("Select Routes", sorted_route_ids)
 
-            for idx, tab in enumerate(selected_tab):
-                with tab:
-                    data = tab_contents[idx]
-                    json_list = [json.loads(item) for item in data['original_json']]
-                    json_str = json.dumps(json_list, indent=4)
-                    data_type = "Vehicle_Positions" if "vehicle_position_latitude" in data.columns else "Trip_Updates"
-                    file_name = f"{selected_name}_{data_type}{'_Filtered' if selected_vehicle_ids else ''}_{fetch_time}.json".replace(" ", "_").replace(":", "-")
-                    st.download_button(label=f"Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=file_name, mime="application/json")
-                    st.json(json_list)
+        # Get filtered vehicle data and trip data using the selected filters
+        filtered_vehicle_data, filtered_trip_data = get_filtered_data(
+            vehicle_data, 
+            trip_data, 
+            selected_vehicle_ids=selected_vehicle_ids,
+            selected_trip_ids=selected_trip_ids,
+            selected_route_ids=selected_route_ids
+        )
 
-        # Display map in second column if there are vehicle positions
-        if not filtered_vehicle_data.empty and 'vehicle_position_latitude' in filtered_vehicle_data.columns and 'vehicle_position_longitude' in filtered_vehicle_data.columns:
-            map_obj = create_map(filtered_vehicle_data)
-            with col2:
-                folium_static(map_obj, width=map_size, height=map_size)
+        # Display the filtered data in tabs
+        if not filtered_vehicle_data.empty or not filtered_trip_data.empty:
+            col1, col2 = st.columns(2)
+
+            tabs = []
+            tab_contents = []
+
+            # Add vehicle data tab if available
+            if not filtered_vehicle_data.empty:
+                tabs.append(f"Vehicle Positions ({len(filtered_vehicle_data)})")
+                tab_contents.append(filtered_vehicle_data)
+            
+            # Add trip data tab if available
+            if not filtered_trip_data.empty:
+                tabs.append(f"Trip Updates ({len(filtered_trip_data)})")
+                tab_contents.append(filtered_trip_data)
+
+            if tabs:
+                selected_tabs = col1.tabs(tabs)
+
+                for idx, tab in enumerate(selected_tabs):
+                    with tab:
+                        data = tab_contents[idx]
+                        json_list = [json.loads(item) for item in data['original_json']]
+                        json_str = json.dumps(json_list, indent=4)
+                        
+                        # Determine data type (vehicle or trip)
+                        data_type = "Vehicle_Positions" if "vehicle_position_latitude" in data.columns else "Trip_Updates"
+                        file_name = f"{selected_name}_{data_type}{'_Filtered' if selected_vehicle_ids or selected_trip_ids or selected_route_ids else ''}_{fetch_time}.json".replace(" ", "_").replace(":", "-")
+
+                        # Provide download button for JSON data
+                        st.download_button(label=f"Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=file_name, mime="application/json")
+                        
+                        # Show JSON data in a formatted manner
+                        st.json(json_list)
+
+            # Display map in the second column if vehicle data contains location information
+            if not filtered_vehicle_data.empty and 'vehicle_position_latitude' in filtered_vehicle_data.columns and 'vehicle_position_longitude' in filtered_vehicle_data.columns:
+                map_obj = create_map(filtered_vehicle_data)
+                with col2:
+                    st.write("Map View:")
+                    folium_static(map_obj, width=map_size, height=map_size)
+            else:
+                col2.write("No vehicle positions available to display on the map.")
         else:
-            col2.write("No vehicle positions available to display on the map.")
+            st.write("No data available for the selected filters.")
