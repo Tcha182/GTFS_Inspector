@@ -15,12 +15,17 @@ import io
 # Set initial page config
 st.set_page_config(page_title="GTFS Inspector", layout="wide", page_icon=":bus:")
 
-st.markdown("""
-<style>
-    [data-testid="stDecoration"] {
-        display: none;
-    }
-</style>""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .css-1v0mbdj {padding-top: 0rem;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 map_size = 500
 
