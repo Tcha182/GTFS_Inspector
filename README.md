@@ -80,14 +80,15 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 
 ## Dependencies
 
-- `streamlit`
-- `requests`
-- `google.transit`
-- `folium`
-- `pandas`
-- `google.oauth2`
-- `streamlit_folium`
-- `openpyxl`
+- `streamlit`: Main framework for creating the web app.
+- `requests`: To make HTTP requests for fetching GTFS data.
+- `google.transit`: For handling GTFS protobuf messages.
+- `folium`: For creating interactive maps to visualize vehicle positions.
+- `pandas`: For data manipulation and processing.
+- `google.oauth2`: For Google Cloud Platform authentication.
+- `google.cloud.storage`: To interact with Google Cloud Storage for file management.
+- `streamlit_folium`: For rendering Folium maps in Streamlit.
+- `openpyxl`: For downloading data as Excel files in XLSX format.
 
 ## License
 
