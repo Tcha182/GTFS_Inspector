@@ -6,8 +6,8 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 
 - Fetch GTFS RT data for vehicle positions and trip updates.
 - Visualize vehicle positions on an interactive map.
-- Filter data by vehicle IDs.
-- Download the fetched data in JSON format.
+- Filter data by Vehicle ID, Trip ID, or Route ID.
+- Download the fetched data in JSON and Excel (XLSX) formats.
 - Manage GTFS RT URLs (Add, Modify, Delete).
 
 ## Installation
@@ -15,8 +15,8 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/yourusername/gtfs-detective.git
-    cd gtfs-detective
+    git clone https://github.com/Tcha182/GTFS_Inspector.git
+    cd GTFS_Inspector
     ```
 
 2. **Create a virtual environment:**
@@ -62,29 +62,33 @@ GTFS Inspector is a Streamlit app designed for the teams of RATP Dev to inspect 
 
     - Use the sidebar to manage GTFS RT URLs (Add, Modify, Delete).
     - Select a GTFS RT feed and fetch the data.
-    - Filter the data by vehicle IDs and view vehicle positions on the map.
-    - Download the fetched data in JSON format.
+    - Filter the data by **Vehicle ID**, **Trip ID**, or **Route ID**.
+    - View vehicle positions on the interactive map.
+    - Download the fetched data in **JSON** or **Excel (XLSX)** formats.
+
 
 ## Functions
 
-- `upload_file(file_name, content, mime_type='application/json', folder_id=None)`: Uploads a file to Google Drive.
-- `download_file(file_id)`: Downloads a file from Google Drive.
-- `find_file_by_name(file_name)`: Finds a file by name on Google Drive.
-- `open_gtfs_realtime_from_url(url)`: Opens GTFS real-time data from a URL.
-- `create_map(dataframe, selected_vehicle_ids=None)`: Creates a map with vehicle positions.
-- `flatten_dict(d, parent_key='', sep='_')`: Flattens a nested dictionary.
-- `protobuf_to_dataframe(feed)`: Converts protobuf messages to a DataFrame.
+- `upload_or_update_network_file(network_name, content)`: Uploads or updates a network configuration file in Google Cloud Storage.
+- `download_network_file(network_name)`: Downloads a network configuration file from Google Cloud Storage.
+- `open_gtfs_realtime_from_url(url)`: Fetches GTFS real-time data from a given URL.
+- `get_filtered_data(vehicle_data, trip_data, filter_option, selected_value)`: Filters vehicle and trip data based on the selected filter type (Vehicle ID, Trip ID, or Route ID).
+- `create_map(filtered_vehicle_data)`: Creates an interactive map showing the filtered vehicle positions.
+- `flatten_dict(d, parent_key='', sep='_')`: Flattens a nested dictionary for easier data processing.
+- `protobuf_to_dataframe(feed)`: Converts GTFS protobuf messages into a Pandas DataFrame.
+
 
 ## Dependencies
 
-- streamlit
-- requests
-- google.transit
-- folium
-- pandas
-- google.oauth2
-- googleapiclient
-- streamlit_folium
+- `streamlit`: Main framework for creating the web app.
+- `requests`: To make HTTP requests for fetching GTFS data.
+- `google.transit`: For handling GTFS protobuf messages.
+- `folium`: For creating interactive maps to visualize vehicle positions.
+- `pandas`: For data manipulation and processing.
+- `google.oauth2`: For Google Cloud Platform authentication.
+- `google.cloud.storage`: To interact with Google Cloud Storage for file management.
+- `streamlit_folium`: For rendering Folium maps in Streamlit.
+- `openpyxl`: For downloading data as Excel files in XLSX format.
 
 ## License
 
