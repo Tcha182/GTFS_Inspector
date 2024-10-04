@@ -162,7 +162,7 @@ def get_filtered_data(vehicle_data, trip_data, filter_option, selected_value):
     filtered_vehicle_data = vehicle_data.copy()
     filtered_trip_data = trip_data.copy()
 
-    if filter_option == "Vehicle":
+    if filter_option == "Vehicle ID":
         # Filter by vehicle ID
         vehicle_id = selected_value
         if vehicle_id:
@@ -311,7 +311,7 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
         col1, col2 = st.columns(2)
 
         # Preliminary filter selection
-        filter_option = st.selectbox("Select Filter Type", ["Vehicle", "Trip ID", "Route ID"], key="filter_option")
+        filter_option = st.selectbox("Select Filter Type", ["Vehicle ID", "Trip ID", "Route ID"], key="filter_option")
 
         # Define filter variables to None initially
         selected_value = None
