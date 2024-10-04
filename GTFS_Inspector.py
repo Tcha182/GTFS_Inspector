@@ -309,7 +309,7 @@ if st.button(f":material/system_update_alt: Load GTFS RT {selected_name}", use_c
                 st.session_state['trip_data'] = trip_data
                 st.session_state['selected_name'] = selected_name
                 st.session_state['fetch_time'] = fetch_time
-                st.session_state['title'] = f"{selected_name} - {fetch_time}"
+                st.session_state['title'] = f"{selected_name} - {fetch_time} UTC"
 
                 title_container.title(st.session_state.title)
 
