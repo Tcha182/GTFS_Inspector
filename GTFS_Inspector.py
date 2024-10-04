@@ -316,7 +316,7 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
         # Define filter variables to None initially
         selected_value = None
 
-        if filter_option == "Vehicle":
+        if filter_option == "Vehicle ID":
             # Get available vehicle IDs to filter
             available_vehicle_ids = set()
             if 'vehicle_vehicle_id' in vehicle_data.columns:
