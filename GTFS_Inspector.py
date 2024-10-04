@@ -226,11 +226,11 @@ network_list = load_network_list()
 
 # Action: Add
 if action == "Add":
-    with st.sidebar.form("Add Network"):
+    with st.sidebar.form("Add Source"):
         name = st.text_input("Network Name")
         vehicle_positions_url = st.text_input("Vehicle Positions URL")
         trip_updates_url = st.text_input("Trip Updates URL")
-        submitted = st.form_submit_button("Add to GTFS-RT list")
+        submitted = st.form_submit_button(":material/add: Add to GTFS-RT list")
         if submitted and name:
             network_data = {
                 "vehicle_positions_url": vehicle_positions_url,
@@ -241,14 +241,14 @@ if action == "Add":
 
 # Action: Modify
 if action == "Modify":
-    name_to_modify = st.sidebar.selectbox("Select GTFS RT to Modify", network_list)
+    name_to_modify = st.sidebar.selectbox("Select Source to Modify", network_list)
     if name_to_modify:
         network_data = json.loads(download_network_file(name_to_modify))
         if network_data:
             with st.sidebar.form("Modify Network"):
                 vehicle_positions_url = st.text_input("Vehicle Positions URL", network_data.get("vehicle_positions_url", ""))
                 trip_updates_url = st.text_input("Trip Updates URL", network_data.get("trip_updates_url", ""))
-                submitted = st.form_submit_button("Save changes")
+                submitted = st.form_submit_button(":material/save: Save changes")
                 if submitted:
                     network_data = {
                         "vehicle_positions_url": vehicle_positions_url,
@@ -259,16 +259,16 @@ if action == "Modify":
 
 # Action: Delete
 if action == "Delete":
-    name_to_delete = st.sidebar.selectbox("Select GTFS RT to Delete", network_list)
+    name_to_delete = st.sidebar.selectbox("Select Source to Delete", network_list)
     if name_to_delete:
-        if st.sidebar.button(f"Delete {name_to_delete}"):
+        if st.sidebar.button(f":material/delete: Delete {name_to_delete}"):
             delete_network_file(name_to_delete)
             clear_network_session_state()
 
 # Select GTFS RT
 network_list = load_network_list()
 if network_list:
-    selected_name = st.selectbox("Select GTFS RT", network_list)
+    selected_name = st.selectbox("Select Source", network_list)
 else:
     st.write("No networks available. Please add a network.")
 
