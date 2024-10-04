@@ -379,6 +379,15 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
             tabs = []
             tab_contents = []
 
+            # Display map in the second column if vehicle data contains location information
+            if not filtered_vehicle_data.empty and 'vehicle_position_latitude' in filtered_vehicle_data.columns and 'vehicle_position_longitude' in filtered_vehicle_data.columns:
+                map_obj = create_map(filtered_vehicle_data)
+                with col2:
+                    st.write("Map View:")
+                    folium_static(map_obj, width=map_size, height=map_size)
+            else:
+                col2.write("No vehicle positions available to display on the map.")
+
             # Add vehicle data tab if available
             if not filtered_vehicle_data.empty:
                 tabs.append(f"Vehicle Positions ({len(filtered_vehicle_data)})")
@@ -412,13 +421,5 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
                         # Show JSON data in a formatted manner
                         st.json(json_list)
 
-            # Display map in the second column if vehicle data contains location information
-            if not filtered_vehicle_data.empty and 'vehicle_position_latitude' in filtered_vehicle_data.columns and 'vehicle_position_longitude' in filtered_vehicle_data.columns:
-                map_obj = create_map(filtered_vehicle_data)
-                with col2:
-                    st.write("Map View:")
-                    folium_static(map_obj, width=map_size, height=map_size)
-            else:
-                col2.write("No vehicle positions available to display on the map.")
         else:
             st.write("No data available for the selected filters.")
