@@ -7,10 +7,10 @@ from google.protobuf.json_format import MessageToDict
 import json
 from streamlit_folium import folium_static
 import pandas as pd
-import io
 from datetime import datetime
 from google.oauth2 import service_account
 from google.cloud import storage
+import io
 
 # Set initial page config
 st.set_page_config(page_title="GTFS Inspector", layout="wide", page_icon=":bus:")
@@ -92,64 +92,34 @@ def open_gtfs_realtime_from_url(url):
         st.error(f"Error opening GTFS RT URL: {e}")
         return None
 
-@st.cache_data
-def get_filtered_data(vehicle_data, trip_data, selected_vehicle_ids=None, selected_trip_ids=None, selected_route_ids=None):
-    # Filter vehicle_data
-    if not vehicle_data.empty:
-        # Filter by vehicle_id
-        if selected_vehicle_ids and 'vehicle_vehicle_id' in vehicle_data.columns:
-            vehicle_data = vehicle_data[vehicle_data['vehicle_vehicle_id'].isin(selected_vehicle_ids)]
-
-        # Filter by trip_id
-        if selected_trip_ids and 'vehicle_trip_tripId' in vehicle_data.columns:
-            vehicle_data = vehicle_data[vehicle_data['vehicle_trip_tripId'].isin(selected_trip_ids)]
-
-        # Filter by route_id
-        if selected_route_ids and 'vehicle_trip_routeId' in vehicle_data.columns:
-            vehicle_data = vehicle_data[vehicle_data['vehicle_trip_routeId'].isin(selected_route_ids)]
-
-        # Collect trip IDs from vehicle_data
-        if 'vehicle_trip_tripId' in vehicle_data.columns:
-            vehicle_trip_ids = vehicle_data['vehicle_trip_tripId'].dropna().unique().tolist()
+# Function to flatten nested dictionaries (protobuf)
+def flatten_dict(d, parent_key='', sep='_'):
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
         else:
-            vehicle_trip_ids = []
+            items.append((new_key, v))
+    return dict(items)
+
+# Function to convert GTFS protobuf feed to dataframe
+def protobuf_to_dataframe(feed):
+    rows = []
+    for entity in feed.entity:
+        entity_dict = MessageToDict(entity)
+        flattened_entity = flatten_dict(entity_dict)
+        flattened_entity['original_json'] = json.dumps(entity_dict)
+        rows.append(flattened_entity)
+    return pd.DataFrame(rows)
+
+def smart_sort(data):
+    if all(str(x).isdigit() for x in data):
+        # If all items are numeric, sort as integers
+        return sorted(data, key=int)
     else:
-        vehicle_trip_ids = []
-
-    # Filter trip_data
-    if not trip_data.empty:
-        # Filter by trip_id
-        if selected_trip_ids and 'tripUpdate_trip_tripId' in trip_data.columns:
-            trip_data = trip_data[trip_data['tripUpdate_trip_tripId'].isin(selected_trip_ids)]
-
-        # Filter by route_id
-        if selected_route_ids and 'tripUpdate_trip_routeId' in trip_data.columns:
-            trip_data = trip_data[trip_data['tripUpdate_trip_routeId'].isin(selected_route_ids)]
-
-        # Filter by vehicle_id
-        if selected_vehicle_ids and 'tripUpdate_vehicle_id' in trip_data.columns:
-            trip_data = trip_data[trip_data['tripUpdate_vehicle_id'].isin(selected_vehicle_ids)]
-
-        # Include trips associated with vehicles in vehicle_data
-        if vehicle_trip_ids and 'tripUpdate_trip_tripId' in trip_data.columns:
-            trip_data = trip_data[trip_data['tripUpdate_trip_tripId'].isin(vehicle_trip_ids)]
-
-        # Collect vehicle IDs from trip_data
-        if 'tripUpdate_vehicle_id' in trip_data.columns:
-            trip_vehicle_ids = trip_data['tripUpdate_vehicle_id'].dropna().unique().tolist()
-        else:
-            trip_vehicle_ids = []
-    else:
-        trip_vehicle_ids = []
-
-    # Filter vehicle_data based on vehicle IDs from trip_data
-    if not vehicle_data.empty and trip_vehicle_ids:
-        if 'vehicle_vehicle_id' in vehicle_data.columns:
-            vehicle_data = vehicle_data[vehicle_data['vehicle_vehicle_id'].isin(trip_vehicle_ids)]
-
-    return vehicle_data, trip_data
-
-
+        # If items are mixed, sort as strings
+        return sorted(data, key=str)
 
 # Function to create a map
 @st.cache_resource
@@ -185,34 +155,48 @@ def create_map(filtered_vehicle_data):
         m.fit_bounds(positions)
     return m
 
-# Function to flatten nested dictionaries (protobuf)
-def flatten_dict(d, parent_key='', sep='_'):
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+# Function to get filtered data
+@st.cache_data
+def get_filtered_data(vehicle_data, trip_data, filter_option, selected_value):
+    # Create copies to avoid modifying the original data
+    filtered_vehicle_data = vehicle_data.copy()
+    filtered_trip_data = trip_data.copy()
 
-# Function to convert GTFS protobuf feed to dataframe
-def protobuf_to_dataframe(feed):
-    rows = []
-    for entity in feed.entity:
-        entity_dict = MessageToDict(entity)
-        flattened_entity = flatten_dict(entity_dict)
-        flattened_entity['original_json'] = json.dumps(entity_dict)
-        rows.append(flattened_entity)
-    return pd.DataFrame(rows)
+    if filter_option == "Vehicle":
+        # Filter by vehicle ID
+        vehicle_id = selected_value
+        if vehicle_id:
+            if 'vehicle_vehicle_id' in filtered_vehicle_data.columns:
+                filtered_vehicle_data = filtered_vehicle_data[filtered_vehicle_data['vehicle_vehicle_id'] == vehicle_id]
+            if 'tripUpdate_vehicle_id' in filtered_trip_data.columns:
+                filtered_trip_data = filtered_trip_data[filtered_trip_data['tripUpdate_vehicle_id'] == vehicle_id]
 
-def smart_sort(data):
-    if all(str(x).isdigit() for x in data):
-        # If all items are numeric, sort as integers
-        return sorted(data, key=int)
-    else:
-        # If items are mixed, sort as strings
-        return sorted(data, key=str)
+    elif filter_option == "Trip ID":
+        # Filter by trip ID
+        trip_id = selected_value
+        if trip_id:
+            if 'tripUpdate_trip_tripId' in filtered_trip_data.columns:
+                filtered_trip_data = filtered_trip_data[filtered_trip_data['tripUpdate_trip_tripId'] == trip_id]
+            # Get vehicle IDs associated with the trip from trip updates
+            vehicle_ids = filtered_trip_data['tripUpdate_vehicle_id'].dropna().unique().tolist() if 'tripUpdate_vehicle_id' in filtered_trip_data.columns else []
+            # Also include vehicle data for these vehicles
+            if vehicle_ids and 'vehicle_vehicle_id' in filtered_vehicle_data.columns:
+                filtered_vehicle_data = filtered_vehicle_data[filtered_vehicle_data['vehicle_vehicle_id'].isin(vehicle_ids)]
+            else:
+                # If vehicle IDs not found, try matching trip IDs in vehicle data
+                if 'vehicle_trip_tripId' in filtered_vehicle_data.columns:
+                    filtered_vehicle_data = filtered_vehicle_data[filtered_vehicle_data['vehicle_trip_tripId'] == trip_id]
+
+    elif filter_option == "Route ID":
+        # Filter by route ID
+        route_id = selected_value
+        if route_id:
+            if 'vehicle_trip_routeId' in filtered_vehicle_data.columns:
+                filtered_vehicle_data = filtered_vehicle_data[filtered_vehicle_data['vehicle_trip_routeId'] == route_id]
+            if 'tripUpdate_trip_routeId' in filtered_trip_data.columns:
+                filtered_trip_data = filtered_trip_data[filtered_trip_data['tripUpdate_trip_routeId'] == route_id]
+
+    return filtered_vehicle_data, filtered_trip_data
 
 # Title
 title_container = st.empty()
@@ -221,7 +205,7 @@ if 'title' not in st.session_state:
 
 title_container.title(st.session_state.title)
 
-# Sidebar
+# Sidebar and other UI components
 st.sidebar.header("Manage Sources")
 
 # Refresh Button
@@ -284,12 +268,11 @@ else:
 # Load GTFS data button action
 if st.button(f":material/system_update_alt: Load GTFS RT {selected_name}", use_container_width=True):
     if selected_name:
-        status_container = st.empty()
-        status_container.info("Loading data...")
+        st.toast(":blue[:material/download:] Loading data...")
         try:
             network_data = json.loads(download_network_file(selected_name))
             if not network_data:
-                status_container.error(f"No data found for network '{selected_name}'.")
+                st.toast(f":orange[:material/error:] No data found for network '{selected_name}'.")
             else:
                 vehicle_data, trip_data = pd.DataFrame(), pd.DataFrame()
 
@@ -297,25 +280,25 @@ if st.button(f":material/system_update_alt: Load GTFS RT {selected_name}", use_c
                     vehicle_feed = open_gtfs_realtime_from_url(network_data["vehicle_positions_url"])
                     if vehicle_feed:
                         vehicle_data = protobuf_to_dataframe(vehicle_feed)
-                        status_container.write(f"Vehicle data - Length: {len(vehicle_data)}")
+                        st.toast(f":material/list: Vehicle data - Length: {len(vehicle_data)}")
                 if network_data.get("trip_updates_url"):
                     trip_feed = open_gtfs_realtime_from_url(network_data["trip_updates_url"])
                     if trip_feed:
                         trip_data = protobuf_to_dataframe(trip_feed)
-                        status_container.write(f"Trip updates - Length: {len(trip_data)}")
+                        st.toast(f":material/list: Trip updates - Length: {len(trip_data)}")
 
                 fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 st.session_state['vehicle_data'] = vehicle_data
                 st.session_state['trip_data'] = trip_data
                 st.session_state['selected_name'] = selected_name
                 st.session_state['fetch_time'] = fetch_time
-                st.session_state['title'] = f"{selected_name} - {fetch_time} UTC"
+                st.session_state['title'] = f"{selected_name} - {fetch_time}"
 
                 title_container.title(st.session_state.title)
 
-                status_container.success("Data loaded successfully!")
+                st.toast(":green[:material/check_circle:]  Data loaded successfully!")
         except Exception as e:
-            status_container.error(f"Error loading data for {selected_name}: {e}")
+            st.toast(f":orange[:material/error:] Error loading data for {selected_name}: {e}")
 
 # Display GTFS data
 if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'fetch_time' in st.session_state:
@@ -328,47 +311,53 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
         col1, col2 = st.columns(2)
 
         # Preliminary filter selection
-        filter_option = st.selectbox("Select Filter Type", ["Vehicle ID", "Trip ID", "Route ID"], key="filter_option")
+        filter_option = st.selectbox("Select Filter Type", ["Vehicle", "Trip ID", "Route ID"], key="filter_option")
 
         # Define filter variables to None initially
-        selected_vehicle_ids, selected_trip_ids, selected_route_ids = None, None, None
+        selected_value = None
 
-        # Depending on the selected filter option, show the appropriate multiselect filter
-        if filter_option == "Vehicle ID":
-            # Vehicle ID filter
+        if filter_option == "Vehicle":
+            # Get available vehicle IDs to filter
             available_vehicle_ids = set()
             if 'vehicle_vehicle_id' in vehicle_data.columns:
-                available_vehicle_ids.update(vehicle_data['vehicle_vehicle_id'].unique())
+                available_vehicle_ids.update(vehicle_data['vehicle_vehicle_id'].dropna().unique())
             sorted_vehicle_ids = smart_sort(available_vehicle_ids)
-            selected_vehicle_ids = st.multiselect("Select Vehicles", sorted_vehicle_ids)
-
+            selected_vehicle_id = st.selectbox("Select Vehicle", [""] + sorted_vehicle_ids)
+            if selected_vehicle_id == "":
+                selected_vehicle_id = None
+            selected_value = selected_vehicle_id
         elif filter_option == "Trip ID":
             # Trip ID filter
             available_trip_ids = set()
             if 'vehicle_trip_tripId' in vehicle_data.columns:
-                available_trip_ids.update(vehicle_data['vehicle_trip_tripId'].unique())
+                available_trip_ids.update(vehicle_data['vehicle_trip_tripId'].dropna().unique())
             if 'tripUpdate_trip_tripId' in trip_data.columns:
-                available_trip_ids.update(trip_data['tripUpdate_trip_tripId'].unique())
+                available_trip_ids.update(trip_data['tripUpdate_trip_tripId'].dropna().unique())
             sorted_trip_ids = smart_sort(available_trip_ids)
-            selected_trip_ids = st.multiselect("Select Trips", sorted_trip_ids)
+            selected_trip_id = st.selectbox("Select Trip", [""] + sorted_trip_ids)
+            if selected_trip_id == "":
+                selected_trip_id = None
+            selected_value = selected_trip_id
 
         elif filter_option == "Route ID":
             # Route ID filter
             available_route_ids = set()
             if 'vehicle_trip_routeId' in vehicle_data.columns:
-                available_route_ids.update(vehicle_data['vehicle_trip_routeId'].unique())
+                available_route_ids.update(vehicle_data['vehicle_trip_routeId'].dropna().unique())
             if 'tripUpdate_trip_routeId' in trip_data.columns:
-                available_route_ids.update(trip_data['tripUpdate_trip_routeId'].unique())
+                available_route_ids.update(trip_data['tripUpdate_trip_routeId'].dropna().unique())
             sorted_route_ids = smart_sort(available_route_ids)
-            selected_route_ids = st.multiselect("Select Routes", sorted_route_ids)
+            selected_route_id = st.selectbox("Select Route", [""] + sorted_route_ids)
+            if selected_route_id == "":
+                selected_route_id = None
+            selected_value = selected_route_id
 
         # Get filtered vehicle data and trip data using the selected filters
         filtered_vehicle_data, filtered_trip_data = get_filtered_data(
-            vehicle_data, 
-            trip_data, 
-            selected_vehicle_ids=selected_vehicle_ids,
-            selected_trip_ids=selected_trip_ids,
-            selected_route_ids=selected_route_ids
+            vehicle_data,
+            trip_data,
+            filter_option=filter_option,
+            selected_value=selected_value
         )
 
         # Display the filtered data in tabs
@@ -382,7 +371,7 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
             if not filtered_vehicle_data.empty:
                 tabs.append(f"Vehicle Positions ({len(filtered_vehicle_data)})")
                 tab_contents.append(filtered_vehicle_data)
-            
+
             # Add trip data tab if available
             if not filtered_trip_data.empty:
                 tabs.append(f"Trip Updates ({len(filtered_trip_data)})")
@@ -396,14 +385,18 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
                         data = tab_contents[idx]
                         json_list = [json.loads(item) for item in data['original_json']]
                         json_str = json.dumps(json_list, indent=4)
-                        
+
                         # Determine data type (vehicle or trip)
                         data_type = "Vehicle_Positions" if "vehicle_position_latitude" in data.columns else "Trip_Updates"
-                        file_name = f"{selected_name}_{data_type}{'_Filtered' if selected_vehicle_ids or selected_trip_ids or selected_route_ids else ''}_{fetch_time}.json".replace(" ", "_").replace(":", "-")
+                        file_name_base = f"{selected_name}_{data_type}{'_Filtered' if selected_value else ''}_{fetch_time}".replace(" ", "_").replace(":", "-")
 
-                        # Provide download button for JSON data
-                        st.download_button(label=f"Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=file_name, mime="application/json")
-                        
+                        # Provide download buttons for JSON and XLSX data
+                        st.download_button(label=f":material/download::material/data_object: Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=f"{file_name_base}.json", mime="application/json")
+                        towrite = io.BytesIO()
+                        data.to_excel(towrite, index=False, header=True)
+                        towrite.seek(0)
+                        st.download_button(label=f":material/download::material/table: Download {data_type.replace('_', ' ')} XLSX", data=towrite, file_name=f"{file_name_base}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
                         # Show JSON data in a formatted manner
                         st.json(json_list)
 
