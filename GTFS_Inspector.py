@@ -144,7 +144,7 @@ def create_map(filtered_vehicle_data):
         map_center = [filtered_vehicle_data['vehicle_position_latitude'].mean(), filtered_vehicle_data['vehicle_position_longitude'].mean()]
         zoom_level = 12
     else:
-        map_center = [48.8566, 2.3522]  # Default location (e.g., Paris)
+        map_center = [48.8566, 2.3522]  # Default location (Paris)
         zoom_level = 12
 
     m = folium.Map(location=map_center, zoom_start=zoom_level)
@@ -273,7 +273,7 @@ if action == "Delete":
 # Select GTFS RT
 network_list = load_network_list()
 if network_list:
-    selected_name = st.selectbox("Select Source", network_list)
+    selected_name = st.selectbox("Select Source", network_list, key="select_network")
 else:
     st.write("No networks available. Please add a network.")
 
