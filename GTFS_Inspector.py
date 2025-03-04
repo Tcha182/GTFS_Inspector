@@ -221,7 +221,7 @@ title_container.title(st.session_state.title)
 st.sidebar.header("Manage Sources")
 
 # Refresh Button
-if st.sidebar.button(":material/refresh: Refresh"):
+if st.sidebar.button(":material/refresh: Refresh", key="refresh_button"):
     clear_network_session_state()
 
 action = st.sidebar.selectbox("Action", ["Add", "Modify", "Delete"], key="action")
