@@ -412,12 +412,23 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
                         file_name_base = f"{selected_name}_{data_type}{'_Filtered' if selected_value else ''}_{fetch_time}".replace(" ", "_").replace(":", "-")
 
                         # Provide download buttons for JSON and XLSX data
-                        st.download_button(label=f":material/download::material/data_object: Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=f"{file_name_base}.json", mime="application/json")
+                        st.download_button(
+                            label=f":material/download::material/data_object: Download {data_type.replace('_', ' ')} JSON",
+                            data=json_str,
+                            file_name=f"{file_name_base}.json",
+                            mime="application/json",
+                            key=f"{data_type}_json_{idx}_{file_name_base}"
+                        )
                         towrite = io.BytesIO()
                         data.to_excel(towrite, index=False, header=True)
                         towrite.seek(0)
-                        st.download_button(label=f":material/download::material/table: Download {data_type.replace('_', ' ')} XLSX", data=towrite, file_name=f"{file_name_base}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+                        st.download_button(
+                            label=f":material/download::material/table: Download {data_type.replace('_', ' ')} XLSX",
+                            data=towrite,
+                            file_name=f"{file_name_base}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"{data_type}_xlsx_{idx}_{file_name_base}"
+                        )
                         # Show JSON data in a formatted manner
                         st.json(json_list)
 
