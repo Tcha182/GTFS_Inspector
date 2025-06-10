@@ -144,7 +144,7 @@ def create_map(filtered_vehicle_data):
         map_center = [filtered_vehicle_data['vehicle_position_latitude'].mean(), filtered_vehicle_data['vehicle_position_longitude'].mean()]
         zoom_level = 12
     else:
-        map_center = [48.8566, 2.3522]  # Default location (e.g., Paris)
+        map_center = [48.8566, 2.3522]  # Default location (Paris)
         zoom_level = 12
 
     m = folium.Map(location=map_center, zoom_start=zoom_level)
@@ -221,7 +221,7 @@ title_container.title(st.session_state.title)
 st.sidebar.header("Manage Sources")
 
 # Refresh Button
-if st.sidebar.button(":material/refresh: Refresh"):
+if st.sidebar.button(":material/refresh: Refresh", key="refresh_button"):
     clear_network_session_state()
 
 action = st.sidebar.selectbox("Action", ["Add", "Modify", "Delete"], key="action")
@@ -273,7 +273,7 @@ if action == "Delete":
 # Select GTFS RT
 network_list = load_network_list()
 if network_list:
-    selected_name = st.selectbox("Select Source", network_list)
+    selected_name = st.selectbox("Select Source", network_list, key="select_network")
 else:
     st.write("No networks available. Please add a network.")
 
@@ -412,12 +412,23 @@ if 'vehicle_data' in st.session_state and 'trip_data' in st.session_state and 'f
                         file_name_base = f"{selected_name}_{data_type}{'_Filtered' if selected_value else ''}_{fetch_time}".replace(" ", "_").replace(":", "-")
 
                         # Provide download buttons for JSON and XLSX data
-                        st.download_button(label=f":material/download::material/data_object: Download {data_type.replace('_', ' ')} JSON", data=json_str, file_name=f"{file_name_base}.json", mime="application/json")
+                        st.download_button(
+                            label=f":material/download::material/data_object: Download {data_type.replace('_', ' ')} JSON",
+                            data=json_str,
+                            file_name=f"{file_name_base}.json",
+                            mime="application/json",
+                            key=f"{data_type}_json_{idx}_{file_name_base}"
+                        )
                         towrite = io.BytesIO()
                         data.to_excel(towrite, index=False, header=True)
                         towrite.seek(0)
-                        st.download_button(label=f":material/download::material/table: Download {data_type.replace('_', ' ')} XLSX", data=towrite, file_name=f"{file_name_base}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+                        st.download_button(
+                            label=f":material/download::material/table: Download {data_type.replace('_', ' ')} XLSX",
+                            data=towrite,
+                            file_name=f"{file_name_base}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"{data_type}_xlsx_{idx}_{file_name_base}"
+                        )
                         # Show JSON data in a formatted manner
                         st.json(json_list)
 
